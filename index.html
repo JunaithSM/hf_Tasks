@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,45 +10,46 @@
 <body>
 
 <header>
-  <div class="logo">HF<span>.</span>TASKS</div>
+  <div class="header-left">
+    <button class="icon-btn hamburger" id="hamburger-btn" onclick="toggleSidebar()">
+      <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="logo">HF<span>.</span>TASKS</div>
+  </div>
   <div class="header-actions">
-    <button class="btn btn-ghost" onclick="exportData()">⬇ Export</button>
-    <button class="btn btn-primary" onclick="openNewTaskModal()">+ New Task</button>
+    <button class="icon-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+      <svg id="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+      <svg id="icon-sun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+    <button class="icon-btn" onclick="exportData()" title="Export CSV">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </button>
+    <button class="icon-btn" onclick="openNewTaskModal()" title="New Task" style="background:var(--accent);color:#fff;border-color:var(--accent)">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
   </div>
 </header>
 
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
 <div class="app">
-  <!-- ─── Sidebar ─── -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">User</div>
+      <select class="filter-select" id="user-switcher" onchange="switchUser(this.value)" style="width:100%;margin-bottom:4px"></select>
+    </div>
     <div class="sidebar-section">
       <div class="sidebar-label">View</div>
-      <div class="sidebar-item active" onclick="setView('all', this)">
-        <span>◈</span> All Tasks <span class="count" id="cnt-all">0</span>
+      <div class="sidebar-item" id="tab-dashboard" onclick="switchTab('dashboard')">
+        <svg class="sidebar-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Dashboard
       </div>
-      <div class="sidebar-item" onclick="setView('mine', this)">
-        <span>◉</span> Mine <span class="count" id="cnt-mine">0</span>
+      <div class="sidebar-item active" id="tab-tasks" onclick="switchTab('tasks')">
+        <svg class="sidebar-icon" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> All Tasks <span class="count" id="cnt-all">0</span>
       </div>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-label">Status</div>
-      <div class="sidebar-item" onclick="setStatusFilter('Completed', this)">
-        <span class="dot" style="background:var(--completed)"></span> Completed <span class="count" id="cnt-completed">0</span>
-      </div>
-      <div class="sidebar-item" onclick="setStatusFilter('Task', this)">
-        <span class="dot" style="background:var(--task)"></span> Task <span class="count" id="cnt-task">0</span>
-      </div>
-      <div class="sidebar-item" onclick="setStatusFilter('Progress', this)">
-        <span class="dot" style="background:var(--progress)"></span> In Progress <span class="count" id="cnt-progress">0</span>
-      </div>
-      <div class="sidebar-item" onclick="setStatusFilter('Bugs', this)">
-        <span class="dot" style="background:var(--bugs)"></span> Bugs <span class="count" id="cnt-bugs">0</span>
-      </div>
-      <div class="sidebar-item" onclick="setStatusFilter('Planning', this)">
-        <span class="dot" style="background:var(--planning)"></span> Planning <span class="count" id="cnt-planning">0</span>
-      </div>
-      <div class="sidebar-item" onclick="setStatusFilter('Paused', this)">
-        <span class="dot" style="background:var(--paused)"></span> Paused <span class="count" id="cnt-paused">0</span>
-      </div>
+      <div id="status-list"></div>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-label">Team</div>
@@ -56,42 +57,45 @@
     </div>
   </aside>
 
-  <!-- ─── Main Content ─── -->
   <main class="main" id="main-content">
-    <div class="stats-bar" id="stats-bar"></div>
-    <div class="progress-section">
-      <div>
-        <div class="pct" id="pct-num">0%</div>
-        <div class="pct-label">Completed</div>
+    <!-- Dashboard View -->
+    <div id="dashboard-view"></div>
+
+    <!-- Tasks View -->
+    <div id="tasks-view">
+      <div class="toolbar">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" style="width:14px;height:14px;stroke:var(--text-muted);fill:none;stroke-width:2;flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search-input" placeholder="Search tasks..." oninput="renderAll()">
+        </div>
+        <div class="filter-group">
+          <select class="filter-select" id="filter-category" onchange="renderAll()">
+            <option value="">All Categories</option>
+          </select>
+          <select class="filter-select" id="filter-assignee" onchange="renderAll()">
+            <option value="">All Assignees</option>
+          </select>
+        </div>
+        <button class="icon-btn" onclick="expandAll()" title="Expand All">
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <button class="icon-btn" onclick="collapseAll()" title="Collapse All">
+          <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
       </div>
-      <div class="full-bar"><div class="full-fill" id="full-fill" style="width:0%"></div></div>
+      <div id="task-groups"></div>
     </div>
-    <div class="toolbar">
-      <div class="search-box">
-        <span class="search-icon">⌕</span>
-        <input type="text" id="search-input" placeholder="Search tasks..." oninput="renderAll()">
-      </div>
-      <div class="filter-group">
-        <select class="filter-select" id="filter-category" onchange="renderAll()">
-          <option value="">All Categories</option>
-        </select>
-        <select class="filter-select" id="filter-assignee" onchange="renderAll()">
-          <option value="">All Assignees</option>
-        </select>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="expandAll()">Expand All</button>
-      <button class="btn btn-ghost btn-sm" onclick="collapseAll()">Collapse</button>
-    </div>
-    <div id="task-groups"></div>
   </main>
 </div>
 
-<!-- ─── Task Modal ─── -->
+<!-- Task Modal -->
 <div class="modal-overlay" id="task-modal">
   <div class="modal">
     <div class="modal-header">
       <div class="modal-title" id="modal-title">New Task</div>
-      <button class="modal-close" onclick="closeModal()">✕</button>
+      <button class="modal-close" onclick="closeModal()">
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="edit-id">
@@ -103,20 +107,11 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Status</label>
-          <select class="form-select" id="f-status">
-            <option>Task</option>
-            <option>Progress</option>
-            <option>Completed</option>
-            <option>Bugs</option>
-            <option>Bug Fixing</option>
-            <option>Paused</option>
-            <option>Planning</option>
-            <option>Cancelled</option>
-          </select>
+          <select class="form-select" id="f-status"></select>
         </div>
         <div class="form-group">
           <label class="form-label">Assigned To</label>
-          <input class="form-input" id="f-assigned" placeholder="Name..." list="assignee-datalist">
+          <input class="form-input" id="f-assigned" placeholder="Names (comma separated)..." list="assignee-datalist">
           <datalist id="assignee-datalist"></datalist>
         </div>
       </div>
@@ -129,41 +124,59 @@
         <div class="form-group">
           <label class="form-label">Priority</label>
           <select class="form-select" id="f-priority">
-            <option>Normal</option>
-            <option>High</option>
-            <option>Critical</option>
-            <option>Low</option>
+            <option>Normal</option><option>High</option><option>Critical</option><option>Low</option>
           </select>
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">Description</label>
-        <textarea class="form-textarea" id="f-desc" placeholder="Describe the task, implementation notes, references..."></textarea>
+        <textarea class="form-textarea" id="f-desc" placeholder="Describe the task..."></textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Due Date</label>
         <input class="form-input" id="f-due" type="date">
       </div>
       <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveTask()">Save Task</button>
+        <button class="btn btn-ghost" onclick="closeModal()">
+          <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;vertical-align:middle;margin-right:4px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Cancel
+        </button>
+        <button class="btn btn-primary" onclick="saveTask()">
+          <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>Save
+        </button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ─── Detail Panel ─── -->
+<!-- Detail Panel -->
 <div class="detail-panel" id="detail-panel">
   <div class="detail-header">
-    <button class="detail-close" onclick="closeDetail()">✕</button>
+    <button class="detail-close" onclick="closeDetail()">
+      <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
     <div id="detail-title" style="font-size:15px;font-weight:700;padding-right:30px;"></div>
     <div style="margin-top:8px;" id="detail-badges"></div>
   </div>
   <div class="detail-body" id="detail-body"></div>
 </div>
 
-<!-- ─── Toast ─── -->
+<!-- Toast -->
 <div class="toast" id="toast"></div>
+
+<!-- Loading Screen -->
+<div class="loading-screen" id="loading-screen">
+  <div class="loading-content">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Connecting to cloud<span class="loading-dots"></span></div>
+  </div>
+</div>
+
+<!-- Offline Banner -->
+<div class="offline-banner" id="offline-banner">
+  <svg viewBox="0 0 16 16" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0"><line x1="2" y1="2" x2="14" y2="14"/><path d="M1 8a7.5 7.5 0 0112.5-4.5M3.5 11A5 5 0 0112 6.5M6 13a2.5 2.5 0 013.5-1"/></svg>
+  <span>Offline — showing cached data</span>
+  <button class="offline-retry" onclick="location.reload()">Retry</button>
+</div>
 
 <script type="module" src="app.js"></script>
 </body>

@@ -23,120 +23,93 @@ const TASKS_COL = 'tasks';
 let APP_CONFIG = {};
 let tasks = [];
 let nextId = 1;
-let currentView = 'all';
 let statusFilter = null;
 let assigneeFilter = null;
 let collapsedCats = new Set();
+let currentTab = 'tasks';
+let currentUser = localStorage.getItem('hf_current_user') || '';
+let sortState = { column: null, direction: 'asc' };
 
 // ─── DOM Cache ─────────────────────────────────────────────────────────────
 const DOM = {};
 function cacheDom() {
   const ids = [
     'search-input', 'filter-category', 'filter-assignee', 'task-groups',
-    'stats-bar', 'pct-num', 'full-fill', 'cnt-all', 'cnt-mine',
+    'cnt-all', 'status-list', 'user-switcher',
     'assignee-list', 'assignee-datalist', 'category-datalist',
     'task-modal', 'modal-title', 'edit-id', 'edit-parent',
     'f-name', 'f-status', 'f-assigned', 'f-category', 'f-priority', 'f-desc', 'f-due',
-    'detail-panel', 'detail-title', 'detail-badges', 'detail-body', 'toast'
+    'detail-panel', 'detail-title', 'detail-badges', 'detail-body', 'toast',
+    'dashboard-view', 'tasks-view', 'tab-dashboard', 'tab-tasks',
+    'sidebar', 'sidebar-overlay', 'icon-moon', 'icon-sun'
   ];
   ids.forEach(id => { DOM[id] = document.getElementById(id); });
 }
 
-// ─── Fallback Config (used when tasks.json can't be fetched, e.g. file://) ─
-const FALLBACK_CONFIG = {
+// ─── Default Config ────────────────────────────────────────────────────────
+const DEFAULT_CONFIG = {
   assigneeColors: { Junaith: '#5b6af0', Naveen: '#22c55e', Madhavan: '#f59e0b' },
   avatarColorPool: ['#5b6af0','#22c55e','#f59e0b','#ec4899','#14b8a6','#f97316'],
   categoryColors: ['#5b6af0','#22c55e','#f59e0b','#ec4899','#14b8a6','#f97316','#ef4444','#a855f7','#06b6d4','#84cc16'],
   defaultAssignee: 'Junaith', defaultStatus: 'Task', defaultPriority: 'Normal'
 };
 
-// ─── Fallback Seed Data (mirrors tasks.json for offline/file:// use) ───────
-const FALLBACK_SEED = [
-  { id:1,  name:'Item In Hand',                      assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:2,  name:'Item Throw',                        assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:3,  name:'Item Drop',                         assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:4,  name:'Item Pickup',                       assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:5,  name:'Item 3D Inspect',                   assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:6,  name:'Item Image Inspect',                assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:7,  name:'Item Look Inspect',                 assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:8,  name:'Item Drop Rotate',                  assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:9,  name:'Item Place',                        assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:10, name:'Item Placable Volume',              assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:11, name:'Item Opening and Closing',          assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:12, name:'Item Look Reading',                 assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:13, name:'Player Chair Sitting and Standing', assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:14, name:'Table Drawer Inventory Setup',      assigned:'Junaith', status:'Completed', category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:15, name:'Main Door Interaction',             assigned:'Junaith', status:'Progress',  category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:16, name:'Main Door Hole View',               assigned:'Junaith', status:'Task',      category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:17, name:'Ladder Climb Up and Down',          assigned:'Junaith', status:'Task',      category:'Interaction Object', priority:'Normal', description:'', due:'', parentId:null },
-  { id:18, name:'In Hand Inventory Widgets',         assigned:'Junaith', status:'Completed', category:'Inventory System',   priority:'Normal', description:'', due:'', parentId:null },
-  { id:19, name:'In Hand Inventory Item Select',     assigned:'Junaith', status:'Completed', category:'Inventory System',   priority:'Normal', description:'', due:'', parentId:null },
-  { id:20, name:'Inventory Widgets',                 assigned:'Junaith', status:'Completed', category:'Inventory System',   priority:'Normal', description:'', due:'', parentId:null },
-  { id:21, name:'Inventory Item Select',             assigned:'Junaith', status:'Completed', category:'Inventory System',   priority:'Normal', description:'', due:'', parentId:null },
-  { id:22, name:'In Hand Item and Inventory Item Swap', assigned:'Junaith', status:'Completed', category:'Inventory System', priority:'Normal', description:'', due:'', parentId:null },
-  { id:23, name:'Jump Effects',                      assigned:'Junaith', status:'Completed', category:'Player',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:24, name:'Sprint Effects',                    assigned:'Junaith', status:'Completed', category:'Player',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:25, name:'Stamina Widget',                    assigned:'Junaith', status:'Completed', category:'Player',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:26, name:'Stamina Attribute',                 assigned:'Junaith', status:'Completed', category:'Player',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:27, name:'Crouch Effect',                     assigned:'Junaith', status:'Completed', category:'Player',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:28, name:'Focus Effect',                      assigned:'Junaith', status:'Completed', category:'Player',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:29, name:'Player Blob Effect',                assigned:'Junaith', status:'Completed', category:'Player',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:30, name:'Foot Step Sound',                   assigned:'Junaith', status:'Completed', category:'Player',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:31, name:'Item Interaction Sound',            assigned:'Junaith', status:'Completed', category:'Player',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:32, name:'Player Inspect Sway',               assigned:'Junaith', status:'Completed', category:'Player',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:33, name:'Player Action Effect',              assigned:'Junaith', status:'Completed', category:'Player',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:34, name:'Sliping',                           assigned:'Junaith', status:'Paused',    category:'Player',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:35, name:'Interaction Input Widget',          assigned:'Junaith', status:'Completed', category:'Widgets',            priority:'Normal', description:'', due:'', parentId:null },
-  { id:36, name:'Inspect Widget',                    assigned:'Junaith', status:'Completed', category:'Widgets',            priority:'Normal', description:'', due:'', parentId:null },
-  { id:37, name:'Item Throw Widget',                 assigned:'Junaith', status:'Completed', category:'Widgets',            priority:'Normal', description:'', due:'', parentId:null },
-  { id:38, name:'Mission Widgets',                   assigned:'Junaith', status:'Completed', category:'Widgets',            priority:'Normal', description:'', due:'', parentId:null },
-  { id:39, name:'Day SetUp Editor Widget',           assigned:'Junaith', status:'Completed', category:'Widgets',            priority:'Normal', description:'', due:'', parentId:null },
-  { id:40, name:'CCTV Camera',                       assigned:'Junaith', status:'Completed', category:'CCTV',               priority:'Normal', description:'', due:'', parentId:null },
-  { id:41, name:'Changing CCTV Camera',              assigned:'Junaith', status:'Completed', category:'CCTV',               priority:'Normal', description:'', due:'', parentId:null },
-  { id:42, name:'CCTV Camera Rotate',                assigned:'Junaith', status:'Paused',    category:'CCTV',               priority:'Normal', description:'', due:'', parentId:null },
-  { id:43, name:'CCTV Placeable Volume',             assigned:'Junaith', status:'Completed', category:'CCTV',               priority:'Normal', description:'', due:'', parentId:null },
-  { id:44, name:'Changing Channels',                 assigned:'Junaith', status:'Task',      category:'TV',                 priority:'Normal', description:'', due:'', parentId:null },
-  { id:45, name:'TV PowerCut',                       assigned:'Junaith', status:'Planning',  category:'TV',                 priority:'Normal', description:'', due:'', parentId:null },
-  { id:46, name:'TV Remote Interaction',             assigned:'Junaith', status:'Task',      category:'TV',                 priority:'Normal', description:'', due:'', parentId:null },
-  { id:47, name:'Computer Password Widgets and Sound', assigned:'Junaith', status:'Completed', category:'Computer',         priority:'Normal', description:'', due:'', parentId:null },
-  { id:48, name:'Computer Mouse Move',               assigned:'Junaith', status:'Completed', category:'Computer',           priority:'Normal', description:'', due:'', parentId:null },
-  { id:49, name:'Computer Setup',                    assigned:'Junaith', status:'Completed', category:'Computer',           priority:'Normal', description:'', due:'', parentId:null },
-  { id:50, name:'Day Start',                         assigned:'Junaith', status:'Completed', category:'Day 1',              priority:'Normal', description:'', due:'', parentId:null },
-  { id:51, name:'Alarm UI Interaction Widget',       assigned:'Junaith', status:'Completed', category:'Day 1',              priority:'Normal', description:'', due:'', parentId:null },
-  { id:52, name:'Player Wake Up',                    assigned:'Junaith', status:'Completed', category:'Day 1',              priority:'Normal', description:'', due:'', parentId:null },
-  { id:53, name:'Day 1 Manager Setup',               assigned:'Junaith', status:'Completed', category:'Day 1',              priority:'Normal', description:'', due:'', parentId:null },
-  { id:54, name:'Alarm Mission',                     assigned:'Junaith', status:'Completed', category:'Day 1',              priority:'Normal', description:'', due:'', parentId:null },
-  { id:55, name:'Post Letter Mission',               assigned:'Junaith', status:'Completed', category:'Day 1',              priority:'Normal', description:'', due:'', parentId:null },
-  { id:56, name:'Alarm Ring',                        assigned:'Junaith', status:'Completed', category:'Day 1',              priority:'Normal', description:'', due:'', parentId:null },
-  { id:57, name:'Player Sleep',                      assigned:'Junaith', status:'Task',      category:'Day 1',              priority:'Normal', description:'', due:'', parentId:null },
-  { id:58, name:'Day 1 Cutscenes Based On State',    assigned:'Junaith', status:'Task',      category:'Day 1',              priority:'Normal', description:'', due:'', parentId:null },
-  { id:59, name:'Day States',                        assigned:'Junaith', status:'Task',      category:'Day 1',              priority:'Normal', description:'', due:'', parentId:null },
-  { id:60, name:'World Day and Night',               assigned:'Junaith', status:'Task',      category:'Day 1',              priority:'Normal', description:'', due:'', parentId:null },
-  { id:61, name:'Day 1 Interaction Item',            assigned:'Junaith', status:'Planning',  category:'Day 1',              priority:'Normal', description:'', due:'', parentId:null },
-  { id:62, name:'Window Interaction',                assigned:'Junaith', status:'Task',      category:'Window',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:63, name:'Window Escape',                     assigned:'Junaith', status:'Task',      category:'Window',             priority:'Normal', description:'', due:'', parentId:null },
-  { id:64, name:'Money System',                      assigned:'Junaith', status:'Planning',  category:'Gameplay Systems',   priority:'Normal', description:'', due:'', parentId:null },
-  { id:65, name:'Radio System',                      assigned:'Junaith', status:'Planning',  category:'Gameplay Systems',   priority:'Normal', description:'', due:'', parentId:null },
-  { id:66, name:'Player Get Ready',                  assigned:'Junaith', status:'Planning',  category:'Gameplay Systems',   priority:'Normal', description:'', due:'', parentId:null },
-  { id:67, name:'Mini Game',                         assigned:'Junaith', status:'Planning',  category:'Gameplay Systems',   priority:'Normal', description:'', due:'', parentId:null },
-];
+// ─── Local Cache Keys ──────────────────────────────────────────────────────
+const CACHE_TASKS_KEY = 'hf_cached_tasks';
+const CACHE_NEXTID_KEY = 'hf_cached_nextId';
 
-// ─── Firestore: Save single task ───────────────────────────────────────────
-async function saveTaskToDb(task) {
+
+
+// ─── Local Cache ───────────────────────────────────────────────────────────
+function cacheToLocal() {
   try {
-    await setDoc(doc(db, TASKS_COL, String(task.id)), task);
-  } catch (e) { console.error('Firestore save failed:', e); }
+    localStorage.setItem(CACHE_TASKS_KEY, JSON.stringify(tasks));
+    localStorage.setItem(CACHE_NEXTID_KEY, String(nextId));
+  } catch (e) { console.warn('localStorage cache failed:', e); }
+}
+
+function loadFromCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_TASKS_KEY);
+    if (!raw) return false;
+    tasks = JSON.parse(raw);
+    nextId = parseInt(localStorage.getItem(CACHE_NEXTID_KEY) || '1', 10);
+    return tasks.length > 0;
+  } catch (e) { return false; }
+}
+
+// ─── Loading / Offline UI ──────────────────────────────────────────────────
+function showLoading() {
+  const el = document.getElementById('loading-screen');
+  if (el) el.classList.add('show');
+}
+function hideLoading() {
+  const el = document.getElementById('loading-screen');
+  if (el) el.classList.remove('show');
+}
+function showOfflineBanner() {
+  const el = document.getElementById('offline-banner');
+  if (el) el.classList.add('show');
+}
+function hideOfflineBanner() {
+  const el = document.getElementById('offline-banner');
+  if (el) el.classList.remove('show');
 }
 
 // ─── Firestore: Save all tasks (batch) ─────────────────────────────────────
 async function save() {
+  // Always cache locally first
+  cacheToLocal();
   try {
     const batch = writeBatch(db);
     tasks.forEach(t => batch.set(doc(db, TASKS_COL, String(t.id)), t));
-    // Store nextId in a meta document
     batch.set(doc(db, TASKS_COL, '_meta'), { nextId });
     await batch.commit();
-  } catch (e) { console.error('Firestore batch save failed:', e); }
+    hideOfflineBanner();
+  } catch (e) {
+    console.error('Firestore batch save failed:', e);
+    showOfflineBanner();
+  }
 }
 
 // ─── Firestore: Delete a task doc ──────────────────────────────────────────
@@ -146,9 +119,11 @@ async function deleteTaskFromDb(id) {
   } catch (e) { console.error('Firestore delete failed:', e); }
 }
 
-// ─── Load from Firestore or seed ───────────────────────────────────────────
+// ─── Load from Firestore → cache → empty ───────────────────────────────────
 async function load() {
-  APP_CONFIG = { ...FALLBACK_CONFIG };
+  APP_CONFIG = { ...DEFAULT_CONFIG };
+  showLoading();
+
   try {
     const snapshot = await getDocs(collection(db, TASKS_COL));
     const docs = [];
@@ -161,21 +136,30 @@ async function load() {
     if (docs.length > 0) {
       tasks = docs;
       nextId = metaDoc ? metaDoc.nextId : (Math.max(...tasks.map(t => t.id)) + 1);
+      cacheToLocal();
+      hideOfflineBanner();
+      hideLoading();
       showToast(`Loaded ${tasks.length} tasks from cloud.`);
       return;
     }
   } catch (e) {
-    console.warn('Firestore read failed, using seed data.', e);
+    console.warn('Firestore unavailable:', e);
   }
 
-  // No Firestore data — seed from embedded data and upload
-  tasks = FALLBACK_SEED.map((t, i) => ({
-    ...t, subtasks: t.subtasks || [],
-    createdAt: t.createdAt || Date.now() - (FALLBACK_SEED.length - i) * 3600000
-  }));
-  nextId = tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) + 1 : 1;
-  await save();
-  showToast('Seed data uploaded to cloud.');
+  // Firestore failed or empty — try local cache
+  if (loadFromCache()) {
+    hideLoading();
+    showOfflineBanner();
+    showToast(`Offline — showing ${tasks.length} cached tasks.`);
+    return;
+  }
+
+  // No data anywhere
+  tasks = [];
+  nextId = 1;
+  hideLoading();
+  showOfflineBanner();
+  showToast('No tasks found. Create one to get started!');
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -183,8 +167,22 @@ function getStatusKey(s) {
   return s.toLowerCase().replace(/ /g, '').replace('bugfixing', 'bugfix');
 }
 
+// ─── Status Icons (inline SVG) ─────────────────────────────────────────────
+const STATUS_ICONS = {
+  completed: '<svg viewBox="0 0 16 16" class="status-icon"><polyline points="3 8 6.5 11.5 13 5"/></svg>',
+  progress:  '<svg viewBox="0 0 16 16" class="status-icon"><path d="M8 3v5l3 3"/><circle cx="8" cy="8" r="5.5" fill="none"/></svg>',
+  task:      '<svg viewBox="0 0 16 16" class="status-icon"><circle cx="8" cy="8" r="5.5" fill="none"/></svg>',
+  bugs:      '<svg viewBox="0 0 16 16" class="status-icon"><circle cx="8" cy="8" r="3"/><line x1="8" y1="1" x2="8" y2="5"/><line x1="8" y1="11" x2="8" y2="15"/><line x1="2" y1="6" x2="5" y2="7"/><line x1="11" y1="7" x2="14" y2="6"/><line x1="2" y1="10" x2="5" y2="9"/><line x1="11" y1="9" x2="14" y2="10"/></svg>',
+  bugfix:    '<svg viewBox="0 0 16 16" class="status-icon"><path d="M5.5 5.5L3 3M10.5 5.5L13 3"/><path d="M4 8h8M4 11h8"/><rect x="4" y="5" width="8" height="8" rx="2" fill="none"/></svg>',
+  paused:    '<svg viewBox="0 0 16 16" class="status-icon"><rect x="4" y="3" width="2.5" height="10" rx="0.5"/><rect x="9.5" y="3" width="2.5" height="10" rx="0.5"/></svg>',
+  planning:  '<svg viewBox="0 0 16 16" class="status-icon"><polygon points="8,2 9.5,6 14,6.5 10.5,9.5 11.5,14 8,11.5 4.5,14 5.5,9.5 2,6.5 6.5,6" fill="none"/></svg>',
+  cancelled: '<svg viewBox="0 0 16 16" class="status-icon"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>',
+};
+
 function badgeHtml(status) {
-  return `<span class="badge badge-${getStatusKey(status)}">${status}</span>`;
+  const key = getStatusKey(status);
+  const icon = STATUS_ICONS[key] || STATUS_ICONS.task;
+  return `<span class="badge badge-${key}">${icon}${status}</span>`;
 }
 
 function priorityDot(p) {
@@ -200,8 +198,20 @@ function avatarHtml(name) {
   return `<span class="avatar" style="background:${c}22;color:${c};border:1px solid ${c}44">${initials}</span>`;
 }
 
+// ─── Multi-Assignee Helpers ────────────────────────────────────────────────
+function taskAssignees(t) {
+  if (!t.assigned) return [];
+  return t.assigned.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function taskHasAssignee(t, name) {
+  return taskAssignees(t).includes(name);
+}
+
 function getAssignees() {
-  return [...new Set(tasks.map(t => t.assigned).filter(Boolean))];
+  const set = new Set();
+  tasks.forEach(t => taskAssignees(t).forEach(a => set.add(a)));
+  return [...set];
 }
 
 function getCategories() {
@@ -209,7 +219,9 @@ function getCategories() {
 }
 
 function getRootTasks() {
-  return tasks.filter(t => !t.parentId);
+  let roots = tasks.filter(t => !t.parentId);
+  if (currentUser) roots = roots.filter(t => taskHasAssignee(t, currentUser));
+  return roots;
 }
 
 function getSubtasks(parentId) {
@@ -225,27 +237,23 @@ function filteredTasks() {
   return tasks.filter(t => {
     if (t.parentId) return false;
     if (statusFilter && t.status !== statusFilter) return false;
-    if (currentView === 'mine' && t.assigned !== (APP_CONFIG.defaultAssignee || 'Junaith')) return false;
-    if (assigneeFilter && t.assigned !== assigneeFilter) return false;
-    if (assF && t.assigned !== assF) return false;
+    if (currentUser && !taskHasAssignee(t, currentUser)) return false;
+    if (assigneeFilter && !taskHasAssignee(t, assigneeFilter)) return false;
+    if (assF && !taskHasAssignee(t, assF)) return false;
     if (catF && t.category !== catF) return false;
     if (search && !t.name.toLowerCase().includes(search) && !(t.category || '').toLowerCase().includes(search)) return false;
     return true;
-  });
+  }).sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 }
 
 // ─── View / Filter Setters ─────────────────────────────────────────────────
-function setView(v, el) {
-  currentView = v; statusFilter = null; assigneeFilter = null;
-  document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
-  el.classList.add('active');
-  renderAll();
-}
+
 
 function setStatusFilter(s, el) {
   statusFilter = statusFilter === s ? null : s;
   document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
   if (statusFilter) el.classList.add('active');
+  if (currentTab !== 'tasks') switchTab('tasks');
   renderAll();
 }
 
@@ -253,34 +261,60 @@ function filterByAssignee(name, el) {
   assigneeFilter = assigneeFilter === name ? null : name;
   document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
   if (assigneeFilter) el.classList.add('active');
+  if (currentTab !== 'tasks') switchTab('tasks');
   renderAll();
 }
 
 // ─── Render Pipeline ───────────────────────────────────────────────────────
+function renderBreadcrumb() { /* placeholder for future breadcrumb UI */ }
+function updateBulkBar() { /* placeholder for future bulk-action bar */ }
+
 function renderAll() {
   updateCounts();
   updateFilters();
+  renderBreadcrumb();
   renderGroups();
-  renderStats();
+  updateBulkBar();
+  if (currentTab === 'dashboard') renderDashboard();
+}
+
+function getStatuses() {
+  return [...new Set(tasks.map(t => t.status).filter(Boolean))];
 }
 
 function updateCounts() {
   const roots = getRootTasks();
   DOM['cnt-all'].textContent = roots.length;
-  DOM['cnt-mine'].textContent = roots.filter(t => t.assigned === (APP_CONFIG.defaultAssignee || 'Junaith')).length;
 
-  ['completed', 'task', 'progress', 'bugs', 'planning', 'paused'].forEach(s => {
-    const el = document.getElementById('cnt-' + s);
-    if (el) el.textContent = roots.filter(t => getStatusKey(t.status) === s).length;
-  });
+  // Dynamic status sidebar
+  const statuses = getStatuses();
+  DOM['status-list'].innerHTML = statuses.map(s => {
+    const k = getStatusKey(s);
+    const cnt = roots.filter(t => t.status === s).length;
+    const active = statusFilter === s ? ' active' : '';
+    return `<div class="sidebar-item${active}" onclick="setStatusFilter('${s}', this)">
+      <span class="dot" style="background:var(--${k})"></span> ${s} <span class="count">${cnt}</span>
+    </div>`;
+  }).join('');
 
   // Assignee sidebar
   DOM['assignee-list'].innerHTML = getAssignees().map(a => {
-    const active = assigneeFilter === a ? 'background:var(--surface3)' : '';
-    return `<div class="sidebar-item" onclick="filterByAssignee('${a}',this)" style="${active}">
-      ${avatarHtml(a)} ${a} <span class="count">${roots.filter(t => t.assigned === a).length}</span>
+    const active = assigneeFilter === a ? ' active' : '';
+    return `<div class="sidebar-item${active}" onclick="filterByAssignee('${a}',this)">
+      ${avatarHtml(a)} ${a} <span class="count">${roots.filter(t => taskHasAssignee(t, a)).length}</span>
     </div>`;
   }).join('');
+
+  // User switcher
+  const users = getAssignees();
+  const sel = DOM['user-switcher'];
+  const prev = sel.value || currentUser;
+  sel.innerHTML = '<option value="">All Users</option>' + users.map(u =>
+    `<option ${prev === u ? 'selected' : ''}>${u}</option>`
+  ).join('');
+  if (!currentUser && users.length > 0) {
+    // Auto-select first user if none set
+  }
 }
 
 function updateFilters() {
@@ -295,26 +329,7 @@ function updateFilters() {
   DOM['category-datalist'].innerHTML = cats.map(c => `<option value="${c}">`).join('');
 }
 
-function renderStats() {
-  const roots = getRootTasks();
-  const total = roots.length;
-  const done = roots.filter(t => t.status === 'Completed').length;
-  const pct = total ? Math.round(done / total * 100) : 0;
-  DOM['pct-num'].textContent = pct + '%';
-  DOM['full-fill'].style.width = pct + '%';
-
-  const statusList = ['Completed', 'Task', 'Progress', 'Bugs', 'Paused', 'Planning'];
-  DOM['stats-bar'].innerHTML = statusList.map(s => {
-    const cnt = roots.filter(t => t.status === s).length;
-    const k = getStatusKey(s);
-    return `<div class="stat-card">
-      <div>
-        <div class="stat-num" style="color:var(--${k})">${cnt}</div>
-        <div class="stat-label">${s}</div>
-      </div>
-    </div>`;
-  }).join('');
-}
+// renderStats moved into renderDashboard
 
 function renderGroups() {
   const ft = filteredTasks();
@@ -356,21 +371,52 @@ function renderGroups() {
   });
 }
 
+function sortIcon(col) {
+  if (sortState.column !== col) return '<span class="sort-icon">&#9650;</span>';
+  return `<span class="sort-icon">${sortState.direction === 'asc' ? '&#9650;' : '&#9660;'}</span>`;
+}
+
+function sortTasks(col) {
+  if (sortState.column === col) {
+    sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortState.column = col;
+    sortState.direction = 'asc';
+  }
+  renderGroups();
+}
+
+function applySorting(list) {
+  if (!sortState.column) return list;
+  const dir = sortState.direction === 'asc' ? 1 : -1;
+  return [...list].sort((a, b) => {
+    let va = a[sortState.column] || '', vb = b[sortState.column] || '';
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    return va < vb ? -dir : va > vb ? dir : 0;
+  });
+}
+
 function buildTaskTable(catTasks) {
   if (catTasks.length === 0) return `<div class="empty-cat">No tasks in this category.</div>`;
+  const sorted = applySorting(catTasks);
   let rows = '';
-  catTasks.forEach(t => {
+  sorted.forEach(t => {
     rows += taskRow(t, false);
     getSubtasks(t.id).forEach(s => rows += taskRow(s, true));
   });
+  const th = (col, label, w) => {
+    const cls = sortState.column === col ? 'sorted' : '';
+    return `<th style="width:${w}" class="${cls}" onclick="sortTasks('${col}')">${label}${sortIcon(col)}</th>`;
+  };
   return `<div class="task-table">
     <table>
       <thead><tr>
-        <th style="width:40%">Task</th>
-        <th style="width:12%">Status</th>
-        <th style="width:12%">Assigned</th>
-        <th style="width:8%">Priority</th>
-        <th style="width:10%">Due</th>
+        ${th('name','Task','40%')}
+        ${th('status','Status','12%')}
+        ${th('assigned','Assigned','12%')}
+        ${th('priority','Priority','8%')}
+        ${th('due','Due','10%')}
         <th style="width:18%">Actions</th>
       </tr></thead>
       <tbody>${rows}</tbody>
@@ -378,26 +424,50 @@ function buildTaskTable(catTasks) {
   </div>`;
 }
 
+function dueInfo(dateStr) {
+  if (!dateStr) return { label: '—', cls: '' };
+  const now = new Date(); now.setHours(0,0,0,0);
+  const due = new Date(dateStr); due.setHours(0,0,0,0);
+  const diff = Math.round((due - now) / 86400000);
+  if (diff < 0) return { label: `${Math.abs(diff)}d overdue`, cls: 'due-overdue' };
+  if (diff === 0) return { label: 'Today', cls: 'due-today' };
+  if (diff <= 3) return { label: `${diff}d left`, cls: 'due-soon' };
+  if (diff <= 7) return { label: `${diff}d left`, cls: 'due-week' };
+  return { label: dateStr, cls: '' };
+}
+
+function highlightSearch(text) {
+  const q = DOM['search-input'].value.trim();
+  if (!q) return text;
+  const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi');
+  return text.replace(regex, '<mark class="search-hl">$1</mark>');
+}
+
 function taskRow(t, isSub) {
   const subs = getSubtasks(t.id);
-  const subCnt = subs.length ? `<span style="font-size:10px;color:var(--text-muted);margin-left:4px;font-family:JetBrains Mono,monospace;">[${subs.length} sub]</span>` : '';
+  const subInfo = subs.length ? (() => {
+    const done = subs.filter(s => s.status === 'Completed').length;
+    return `<span class="subtask-progress">${done}/${subs.length} sub</span>`;
+  })() : '';
+  const due = dueInfo(t.due);
   return `<tr class="task-row" onclick="openDetail(${t.id})">
     <td class="${isSub ? 'task-indent' : ''}">
       <div class="task-name">
         ${isSub ? '<span class="subtask-icon">↳</span>' : ''}
         ${priorityDot(t.priority || 'Normal')}
-        <span>${t.name}</span>${subCnt}
+        <span>${highlightSearch(t.name)}</span>${subInfo}
       </div>
     </td>
     <td>${badgeHtml(t.status)}</td>
-    <td><div class="assignee-chip">${avatarHtml(t.assigned || '?')} ${t.assigned || '—'}</div></td>
+    <td><div class="assignee-chip">${taskAssignees(t).map(a => avatarHtml(a)).join('')} ${t.assigned || '—'}</div></td>
     <td><span style="font-size:11px;color:var(--text-dim);font-family:JetBrains Mono,monospace">${t.priority || 'Normal'}</span></td>
-    <td><span style="font-size:11px;font-family:JetBrains Mono,monospace;color:var(--text-muted)">${t.due || '—'}</span></td>
+    <td><span class="due-label ${due.cls}">${due.label}</span></td>
     <td onclick="event.stopPropagation()">
       <div class="task-actions">
-        <button class="act-btn" onclick="openEditModal(${t.id})">Edit</button>
-        <button class="act-btn" onclick="openNewTaskModal(${t.id})">+ Sub</button>
-        <button class="act-btn del" onclick="deleteTask(${t.id})">Del</button>
+        <button class="act-btn" onclick="openEditModal(${t.id})" title="Edit"><svg viewBox="0 0 16 16" class="act-icon"><path d="M11.5 2.5l2 2L5 13H3v-2z"/></svg></button>
+        <button class="act-btn" onclick="duplicateTask(${t.id})" title="Duplicate"><svg viewBox="0 0 16 16" class="act-icon"><rect x="5" y="5" width="8" height="8" rx="1" fill="none"/><path d="M3 11V3h8" fill="none"/></svg></button>
+        <button class="act-btn" onclick="openNewTaskModal(${t.id})" title="Add subtask"><svg viewBox="0 0 16 16" class="act-icon"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg></button>
+        <button class="act-btn del" onclick="deleteTask(${t.id})" title="Delete"><svg viewBox="0 0 16 16" class="act-icon"><polyline points="3 5 4 14 12 14 13 5"/><line x1="2" y1="5" x2="14" y2="5"/><path d="M6 5V3h4v2"/></svg></button>
       </div>
     </td>
   </tr>`;
@@ -418,13 +488,22 @@ function collapseAll() {
 }
 
 // ─── Modal: New / Edit Task ────────────────────────────────────────────────
+function populateStatusDropdown() {
+  const sel = DOM['f-status'];
+  const existing = getStatuses();
+  const defaults = ['Task','Progress','Completed','Bugs','Bug Fixing','Paused','Planning','Cancelled'];
+  const all = [...new Set([...defaults, ...existing])];
+  sel.innerHTML = all.map(s => `<option>${s}</option>`).join('');
+}
+
 function openNewTaskModal(parentId = '', category = '') {
+  populateStatusDropdown();
   DOM['modal-title'].textContent = parentId ? 'New Subtask' : 'New Task';
   DOM['edit-id'].value = '';
   DOM['edit-parent'].value = parentId;
   DOM['f-name'].value = '';
   DOM['f-status'].value = APP_CONFIG.defaultStatus || 'Task';
-  DOM['f-assigned'].value = APP_CONFIG.defaultAssignee || 'Junaith';
+  DOM['f-assigned'].value = currentUser || APP_CONFIG.defaultAssignee || '';
   DOM['f-category'].value = category;
   DOM['f-priority'].value = APP_CONFIG.defaultPriority || 'Normal';
   DOM['f-desc'].value = '';
@@ -433,6 +512,7 @@ function openNewTaskModal(parentId = '', category = '') {
 }
 
 function openEditModal(id) {
+  populateStatusDropdown();
   const t = tasks.find(x => x.id === id);
   if (!t) return;
   DOM['modal-title'].textContent = 'Edit Task';
@@ -483,18 +563,46 @@ function saveTask() {
   renderAll();
 }
 
-// ─── Delete ────────────────────────────────────────────────────────────────
+// ─── Delete (with undo) ─────────────────────────────────────────────────────
+let deleteTimeout = null;
 async function deleteTask(id) {
-  if (!confirm('Delete this task and all its subtasks?')) return;
-  const subtaskIds = tasks.filter(t => t.parentId === id).map(t => t.id);
+  const deleted = tasks.filter(t => t.id === id || t.parentId === id);
   tasks = tasks.filter(t => t.id !== id && t.parentId !== id);
-  // Delete from Firestore
-  await deleteTaskFromDb(id);
-  for (const sid of subtaskIds) await deleteTaskFromDb(sid);
-  await save();
-  showToast('Task deleted.');
-  closeDetail();
   renderAll();
+  closeDetail();
+
+  clearTimeout(deleteTimeout);
+  DOM['toast'].innerHTML = `Task deleted. <button class="undo-btn" onclick="undoDelete()">Undo</button>`;
+  DOM['toast'].classList.add('show');
+  window._deletedTasks = deleted;
+
+  deleteTimeout = setTimeout(async () => {
+    DOM['toast'].classList.remove('show');
+    for (const t of deleted) await deleteTaskFromDb(t.id);
+    await save();
+    window._deletedTasks = null;
+  }, 5000);
+}
+
+function undoDelete() {
+  if (!window._deletedTasks) return;
+  clearTimeout(deleteTimeout);
+  tasks.push(...window._deletedTasks);
+  window._deletedTasks = null;
+  DOM['toast'].classList.remove('show');
+  renderAll();
+  showToast('Task restored.');
+}
+
+// ─── Duplicate Task ─────────────────────────────────────────────────────────
+function duplicateTask(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  const dup = { ...t, id: nextId++, name: t.name + ' (copy)', createdAt: Date.now() };
+  tasks.push(dup);
+  save();
+  renderAll();
+  showToast('Task duplicated.');
 }
 
 // ─── Detail Panel ──────────────────────────────────────────────────────────
@@ -582,20 +690,160 @@ function showToast(msg) {
   setTimeout(() => DOM['toast'].classList.remove('show'), 2500);
 }
 
+// ─── Theme Toggle ──────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') !== 'light';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  DOM['icon-moon'].style.display = isDark ? 'none' : '';
+  DOM['icon-sun'].style.display = isDark ? '' : 'none';
+  localStorage.setItem('hf_theme', isDark ? 'light' : 'dark');
+}
+
+function loadTheme() {
+  const saved = localStorage.getItem('hf_theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+    if (saved === 'light') {
+      DOM['icon-moon'].style.display = 'none';
+      DOM['icon-sun'].style.display = '';
+    }
+  }
+}
+
+// ─── Mobile Sidebar ────────────────────────────────────────────────────────
+function toggleSidebar() {
+  DOM['sidebar'].classList.toggle('open');
+  DOM['sidebar-overlay'].classList.toggle('open');
+}
+
+// ─── Tab Switch ────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  DOM['tab-dashboard'].classList.toggle('active', tab === 'dashboard');
+  DOM['tab-tasks'].classList.toggle('active', tab === 'tasks');
+  DOM['dashboard-view'].classList.toggle('active', tab === 'dashboard');
+  DOM['tasks-view'].classList.toggle('hidden', tab === 'dashboard');
+  // Close mobile sidebar on tab switch
+  DOM['sidebar'].classList.remove('open');
+  DOM['sidebar-overlay'].classList.remove('open');
+  if (tab === 'dashboard') renderDashboard();
+}
+
+// ─── Dashboard ─────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const roots = getRootTasks();
+  const total = roots.length;
+  const done = roots.filter(t => t.status === 'Completed').length;
+  const pct = total ? Math.round(done / total * 100) : 0;
+
+  // Progress bar
+  let html = `<div class="progress-section"><div><div class="pct">${pct}%</div><div class="pct-label">Completed</div></div>
+    <div class="full-bar"><div class="full-fill" style="width:${pct}%"></div></div></div>`;
+
+  // Dynamic overview cards from data
+  const statuses = getStatuses();
+  html += `<div class="dash-grid">
+    <div class="dash-card"><div class="dash-card-label">Total Tasks</div><div class="dash-card-value" style="color:var(--text)">${total}</div></div>`;
+  statuses.forEach(s => {
+    const cnt = roots.filter(t => t.status === s).length;
+    const k = getStatusKey(s);
+    html += `<div class="dash-card"><div class="dash-card-label">${s}</div><div class="dash-card-value" style="color:var(--${k})">${cnt}</div></div>`;
+  });
+  html += `</div>`;
+
+  // Category breakdown
+  const cats = getCategories();
+  const catColors = APP_CONFIG.categoryColors || ['#5b6af0'];
+  html += `<div class="dash-section"><div class="dash-section-title">Category Progress</div>`;
+  cats.forEach((cat, i) => {
+    const ct = roots.filter(t => t.category === cat);
+    const cd = ct.filter(t => t.status === 'Completed').length;
+    const cp = ct.length ? Math.round(cd / ct.length * 100) : 0;
+    const color = catColors[i % catColors.length];
+    html += `<div class="dash-bar-row">
+      <div class="dash-bar-label">${cat} (${cd}/${ct.length})</div>
+      <div class="dash-bar-track"><div class="dash-bar-fill" style="width:${cp}%;background:${color}"></div></div>
+      <div class="dash-bar-pct">${cp}%</div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Assignee workload
+  html += `<div class="dash-section"><div class="dash-section-title">Team Workload</div><div class="dash-workload-grid">`;
+  getAssignees().forEach(a => {
+    const at = roots.filter(t => taskHasAssignee(t, a));
+    const ad = at.filter(t => t.status === 'Completed').length;
+    html += `<div class="dash-workload-card">
+      <div class="dash-workload-name">${avatarHtml(a)} ${a}</div>
+      <div class="dash-workload-stats">
+        <span class="badge badge-completed">${ad} done</span>
+        <span class="badge badge-progress">${at.filter(t=>t.status==='Progress').length} wip</span>
+        <span class="badge badge-task">${at.filter(t=>t.status==='Task').length} todo</span>
+        <span class="badge badge-bugs">${at.filter(t=>t.status==='Bugs').length} bugs</span>
+      </div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // Recent activity (last 10 by createdAt)
+  const recent = [...roots].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 10);
+  html += `<div class="dash-section"><div class="dash-section-title">Recent Tasks</div><div class="dash-activity">`;
+  recent.forEach(t => {
+    html += `<div class="dash-activity-item" onclick="switchTab('tasks');openDetail(${t.id})" style="cursor:pointer">
+      ${avatarHtml(t.assigned || '?')}
+      <span style="flex:1">${t.name}</span>
+      ${badgeHtml(t.status)}
+      <span style="font-size:10px;color:var(--text-muted);font-family:JetBrains Mono,monospace">${t.category || ''}</span>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  DOM['dashboard-view'].innerHTML = html;
+}
+
+// ─── User Switcher ─────────────────────────────────────────────────────────
+function switchUser(name) {
+  currentUser = name;
+  localStorage.setItem('hf_current_user', name);
+  renderAll();
+  showToast(name ? `Switched to ${name}` : 'Viewing all users');
+}
+
 // ─── Expose to window (required for type="module" onclick handlers) ────────
 Object.assign(window, {
-  setView, setStatusFilter, filterByAssignee, renderAll,
-  expandAll, collapseAll, toggleCat,
+  setStatusFilter, filterByAssignee, renderAll,
+  expandAll, collapseAll, toggleCat, sortTasks,
   openNewTaskModal, openEditModal, closeModal, saveTask,
-  deleteTask, openDetail, closeDetail, exportData
+  deleteTask, undoDelete, duplicateTask,
+  openDetail, closeDetail, exportData,
+  toggleTheme, toggleSidebar, switchTab, switchUser
 });
 
 // ─── Init ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   cacheDom();
+  loadTheme();
 
   DOM['task-modal'].addEventListener('click', function (e) {
     if (e.target === this) closeModal();
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    // Skip if user is typing in an input/textarea/select
+    const tag = document.activeElement.tagName;
+    if (['INPUT','TEXTAREA','SELECT'].includes(tag)) {
+      if (e.key === 'Escape') document.activeElement.blur();
+      return;
+    }
+    switch(e.key) {
+      case 'n': case 'N': e.preventDefault(); openNewTaskModal(); break;
+      case 'Escape': closeModal(); closeDetail(); break;
+      case '/': e.preventDefault(); DOM['search-input'].focus(); break;
+      case 'd': case 'D': e.preventDefault(); switchTab(currentTab === 'dashboard' ? 'tasks' : 'dashboard'); break;
+      case 't': e.preventDefault(); toggleTheme(); break;
+    }
   });
 
   await load();
