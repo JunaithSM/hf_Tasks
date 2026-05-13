@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HF Task Manager — Track tasks, bugs, and progress for the HF project.">
+  <title>HF Task Manager</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <div class="logo">HF<span>.</span>TASKS</div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="exportData()">⬇ Export</button>
+    <button class="btn btn-primary" onclick="openNewTaskModal()">+ New Task</button>
+  </div>
+</header>
+
+<div class="app">
+  <!-- ─── Sidebar ─── -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">View</div>
+      <div class="sidebar-item active" onclick="setView('all', this)">
+        <span>◈</span> All Tasks <span class="count" id="cnt-all">0</span>
+      </div>
+      <div class="sidebar-item" onclick="setView('mine', this)">
+        <span>◉</span> Mine <span class="count" id="cnt-mine">0</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Status</div>
+      <div class="sidebar-item" onclick="setStatusFilter('Completed', this)">
+        <span class="dot" style="background:var(--completed)"></span> Completed <span class="count" id="cnt-completed">0</span>
+      </div>
+      <div class="sidebar-item" onclick="setStatusFilter('Task', this)">
+        <span class="dot" style="background:var(--task)"></span> Task <span class="count" id="cnt-task">0</span>
+      </div>
+      <div class="sidebar-item" onclick="setStatusFilter('Progress', this)">
+        <span class="dot" style="background:var(--progress)"></span> In Progress <span class="count" id="cnt-progress">0</span>
+      </div>
+      <div class="sidebar-item" onclick="setStatusFilter('Bugs', this)">
+        <span class="dot" style="background:var(--bugs)"></span> Bugs <span class="count" id="cnt-bugs">0</span>
+      </div>
+      <div class="sidebar-item" onclick="setStatusFilter('Planning', this)">
+        <span class="dot" style="background:var(--planning)"></span> Planning <span class="count" id="cnt-planning">0</span>
+      </div>
+      <div class="sidebar-item" onclick="setStatusFilter('Paused', this)">
+        <span class="dot" style="background:var(--paused)"></span> Paused <span class="count" id="cnt-paused">0</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Team</div>
+      <div id="assignee-list"></div>
+    </div>
+  </aside>
+
+  <!-- ─── Main Content ─── -->
+  <main class="main" id="main-content">
+    <div class="stats-bar" id="stats-bar"></div>
+    <div class="progress-section">
+      <div>
+        <div class="pct" id="pct-num">0%</div>
+        <div class="pct-label">Completed</div>
+      </div>
+      <div class="full-bar"><div class="full-fill" id="full-fill" style="width:0%"></div></div>
+    </div>
+    <div class="toolbar">
+      <div class="search-box">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="search-input" placeholder="Search tasks..." oninput="renderAll()">
+      </div>
+      <div class="filter-group">
+        <select class="filter-select" id="filter-category" onchange="renderAll()">
+          <option value="">All Categories</option>
+        </select>
+        <select class="filter-select" id="filter-assignee" onchange="renderAll()">
+          <option value="">All Assignees</option>
+        </select>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="expandAll()">Expand All</button>
+      <button class="btn btn-ghost btn-sm" onclick="collapseAll()">Collapse</button>
+    </div>
+    <div id="task-groups"></div>
+  </main>
+</div>
+
+<!-- ─── Task Modal ─── -->
+<div class="modal-overlay" id="task-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">New Task</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <input type="hidden" id="edit-parent">
+      <div class="form-group">
+        <label class="form-label">Task Name *</label>
+        <input class="form-input" id="f-name" placeholder="Task name..." required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="f-status">
+            <option>Task</option>
+            <option>Progress</option>
+            <option>Completed</option>
+            <option>Bugs</option>
+            <option>Bug Fixing</option>
+            <option>Paused</option>
+            <option>Planning</option>
+            <option>Cancelled</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Assigned To</label>
+          <input class="form-input" id="f-assigned" placeholder="Name..." list="assignee-datalist">
+          <datalist id="assignee-datalist"></datalist>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <input class="form-input" id="f-category" placeholder="Category..." list="category-datalist">
+          <datalist id="category-datalist"></datalist>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Priority</label>
+          <select class="form-select" id="f-priority">
+            <option>Normal</option>
+            <option>High</option>
+            <option>Critical</option>
+            <option>Low</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-textarea" id="f-desc" placeholder="Describe the task, implementation notes, references..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Due Date</label>
+        <input class="form-input" id="f-due" type="date">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveTask()">Save Task</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Detail Panel ─── -->
+<div class="detail-panel" id="detail-panel">
+  <div class="detail-header">
+    <button class="detail-close" onclick="closeDetail()">✕</button>
+    <div id="detail-title" style="font-size:15px;font-weight:700;padding-right:30px;"></div>
+    <div style="margin-top:8px;" id="detail-badges"></div>
+  </div>
+  <div class="detail-body" id="detail-body"></div>
+</div>
+
+<!-- ─── Toast ─── -->
+<div class="toast" id="toast"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
